@@ -151,11 +151,11 @@ When designing media players, podcast UIs, or audio experiences, generate sample
 
 **Fetch icons BEFORE building sections** — use the **icon-library** skill:
 ```bash
-# Fetch all icons needed for the page in one batch
-curl -s https://unpkg.com/lucide-static/icons/home.svg
-curl -s https://unpkg.com/lucide-static/icons/search.svg
-curl -s https://unpkg.com/lucide-static/icons/bell.svg
-curl -s https://unpkg.com/lucide-static/icons/user.svg
+# Fetch all icons needed for the page in one batch (from @fluentui/svg-icons)
+curl -s https://unpkg.com/@fluentui/svg-icons@latest/icons/home_24_regular.svg
+curl -s https://unpkg.com/@fluentui/svg-icons@latest/icons/search_24_regular.svg
+curl -s https://unpkg.com/@fluentui/svg-icons@latest/icons/bell_24_regular.svg
+curl -s https://unpkg.com/@fluentui/svg-icons@latest/icons/person_24_regular.svg
 ```
 
 Then insert inline when building each section:
@@ -202,50 +202,138 @@ await __figb.fonts(
 - Use **rich typography** — mix font weights, sizes, and colors for hierarchy
 - Add **visual rhythm** — vary section heights, use whitespace intentionally
 
-## Design Language Page — CREATE THIS FIRST
+## Design Language — Use Fluent 2, Never Create Custom Styles
 
-**When creating a new design from scratch**, always start by creating a dedicated **"Design Language"** page in the Figma file. This page defines the visual foundation that all other pages must follow.
+**All designs use the Fluent 2 Design System.** Never create custom Paint Styles, Text Styles, Effect Styles, or Components. Instead, import directly from the Fluent 2 library file.
 
-### Step 0 (before any other design work): Create the Design Language page
+- **Fluent 2 file key**: `GvIcCw0tWaJVDSWD4f1OIW`
+
+### Importing Fluent 2 Styles and Components
 
 ```javascript
-const designLanguagePage = figma.createPage();
-designLanguagePage.name = "🎨 Design Language";
+// Import a color/paint style by key and apply it
+const colorStyle = await figma.importStyleByKeyAsync('<style_key>');
+node.fillStyleId = colorStyle.id;
+
+// Import a text style by key and apply it
+const textStyle = await figma.importStyleByKeyAsync('<style_key>');
+textNode.textStyleId = textStyle.id;
+
+// Import an effect style by key and apply it
+const effectStyle = await figma.importStyleByKeyAsync('<style_key>');
+node.effectStyleId = effectStyle.id;
+
+// Import a component by key and create an instance
+const component = await figma.importComponentByKeyAsync('<component_key>');
+const instance = component.createInstance();
+figma.currentPage.appendChild(instance);
 ```
 
-The Design Language page must include these sections:
+Style and component keys come from the **figma-rest-api** skill — enumerate the Fluent 2 file before building any design and pass the key map to all design scripts.
 
-#### 1. Color Palette
-- Primary, secondary, accent colors (with full scales: 50-950)
-- Neutral/gray scale
-- Semantic colors: success, warning, error, info
-- Create as Figma Paint Styles (`figma.createPaintStyle()`) so they can be reused across all pages
+### Rules
 
-#### 2. Typography Scale
-- Heading styles: H1 through H6 (with font family, size, weight, line-height)
-- Body text: large, base, small, caption
-- Create as Figma Text Styles (`figma.createTextStyle()`) for reuse
+- **NEVER** call `figma.createPaintStyle()`, `figma.createTextStyle()`, or `figma.createEffectStyle()` — Fluent 2 already defines all styles
+- **NEVER** call `figma.createComponent()` for standard UI elements (buttons, inputs, cards, badges) — import from Fluent 2 instead
+- **NEVER** hardcode hex values for brand colors or font sizes for text styles — always bind to an imported Fluent 2 style
+- Use `__figb.*` helpers for **layout/structural frames only** (wrappers, grids, sections) — Fluent 2 handles all UI components
+- Icons are fetched from `@fluentui/svg-icons` (see **icon-library** skill) — Fluent UI icons are visually consistent with Fluent 2 components and available as raw SVGs via unpkg
 
-#### 3. Spacing & Grid
-- Spacing scale visualization (4px grid: 4, 8, 12, 16, 24, 32, 48, 64)
-- Layout grid definition (columns, gutters, margins)
+After importing styles and components, **all pages must reference these imports**. Never introduce one-off values.
 
-#### 4. Effects
-- Shadow scale: sm, base, md, lg, xl
-- Create as Figma Effect Styles (`figma.createEffectStyle()`)
-- Border radius scale: sm (4px), base (8px), md (12px), lg (16px), xl (24px), full (9999px)
+## Brand Token Override — Applying Visual Style
 
-#### 5. Icon Set
-- Fetch and display the core icons needed for the project using the **icon-library** skill
-- Organize in a grid showing icon name + visual
+When the design plan includes Visual Style Overrides from `constitution.md`, apply them at the start of every page build — before any section is created.
 
-#### 6. Core UI Components
-- Buttons (primary, secondary, outline, ghost — with states: default, hover, disabled)
-- Input fields (text, select, checkbox, radio, toggle)
-- Cards, badges, tags, avatars
-- Build as Figma Components (`figma.createComponent()`) so instances can be used across pages
+### Step 1: Create a local Variables collection to shadow Fluent 2's brand ramp
 
-After the Design Language page is complete, **all subsequent pages must use these defined styles, colors, components, and icons**. Never introduce one-off values — always reference the design language.
+```javascript
+// Run ONCE per page, before any sections are built
+const col = figma.variables.createVariableCollection('Brand Override');
+const modeId = col.defaultModeId;
+
+// Example for brand-color: #7B2FBE (purple)
+// Generate by keeping hue+saturation from brand-color, varying HSL lightness
+const ramp = {
+  brand10:  { r: 0.96, g: 0.93, b: 1.00, a: 1 }, // 97% lightness — tints, hover backgrounds
+  brand20:  { r: 0.91, g: 0.84, b: 0.99, a: 1 },
+  brand30:  { r: 0.82, g: 0.71, b: 0.97, a: 1 },
+  brand40:  { r: 0.71, g: 0.56, b: 0.93, a: 1 },
+  brand50:  { r: 0.59, g: 0.40, b: 0.88, a: 1 },
+  brand60:  { r: 0.48, g: 0.18, b: 0.74, a: 1 }, // primary — matches brand-color exactly
+  brand70:  { r: 0.38, g: 0.14, b: 0.60, a: 1 },
+  brand80:  { r: 0.29, g: 0.10, b: 0.47, a: 1 }, // text on light backgrounds
+  brand90:  { r: 0.21, g: 0.07, b: 0.35, a: 1 },
+  brand100: { r: 0.15, g: 0.05, b: 0.25, a: 1 },
+  brand160: { r: 0.04, g: 0.01, b: 0.07, a: 1 }, // 3% lightness — pressed states
+};
+
+for (const [name, color] of Object.entries(ramp)) {
+  const v = figma.variables.createVariable(name, col.id, 'COLOR');
+  v.setValueForMode(modeId, color);
+}
+```
+
+**To generate the ramp from any hex:** extract HSL, keep hue and saturation, step lightness from 97% (brand10) to 3% (brand160) in 16 steps. Always use brand60 as the primary (matching the brand-color hex from `constitution.md` exactly).
+
+### Step 2: Apply brand ramp to structural frames only
+
+```javascript
+// Hero — brand60 (primary fill)
+const hero = __figb.frame('Hero', {
+  w: 1440, h: 500, direction: 'VERTICAL', p: 64, mainAlign: 'CENTER',
+  fill: __figb.hex('#7B2FBE'), // brand60 from ramp
+});
+
+// Light section — brand10 (background tint)
+const section = __figb.frame('Features', {
+  w: 1440, direction: 'VERTICAL', p: 80, gap: 48,
+  fill: __figb.hex('#F5EEFF'), // brand10 from ramp
+});
+
+// Accent bar — brand40
+__figb.rect({ w: 64, h: 4, fill: __figb.hex('#B58EEB'), radius: 2, parent: section });
+```
+
+### Step 3: Apply corner-radius, shadow, and spacing from visual style
+
+All structural frames must use the values from the visual style overrides passed by the orchestrator:
+
+```javascript
+// Visual style overrides — received from orchestrator (from constitution.md)
+const vs = {
+  radius:  24,    // corner-radius: xl → Playful mood
+  gap:     24,    // spacing: spacious
+  px:      32,
+  py:      24,
+  shadow:  'Md',  // shadow: md → use __figb.shadowMd()
+  bgLight: '#FAFAFA',
+  bgDark:  '#1A1A1A',
+};
+
+const card = __figb.frame('Card', {
+  w: 320, direction: 'VERTICAL',
+  radius: vs.radius,
+  effects: __figb[`shadow${vs.shadow}`](),
+  gap: vs.gap, px: vs.px, py: vs.py,
+  fill: __figb.hex('#FFFFFF'),
+});
+```
+
+Shadow helper names: `shadowMd()`, `shadowLg()`, `shadowSm()` (use `__figb.shadow(0,1,2,0.06)` for none/minimal).
+
+### What to override vs. what to leave to Fluent 2
+
+| Element | Apply visual style override | Leave to Fluent 2 |
+|---|---|---|
+| Page / section backgrounds | ✓ brand ramp + theme bg | |
+| Hero fills, decorative shapes, accent bars | ✓ brand ramp colors | |
+| All structural layout frames | ✓ corner-radius, shadow, spacing | |
+| Heading text on custom frames | ✓ brand80 for colored headings | |
+| Button (Primary, Secondary, Danger) | | ✓ Fluent 2 handles internally |
+| TextInput, Checkbox, Dropdown, Toggle | | ✓ Fluent 2 |
+| Typography sizes and weights | | ✓ Fluent 2 text styles |
+| Fluent 2 component instances | | ✓ never override fills on instances |
 
 ## Execution Strategy — Chunked Scripts + Helper Library
 
@@ -427,7 +515,7 @@ await __figb.txt('Card Title', { size: 18, style: 'Bold', parent: card });
 │                                                                        │
 │     ┌─ Agent: Icons ──────────┐  ┌─ Agent: Images ─────────────────┐ │
 │     │ curl all icon SVGs from │  │ WebSearch Unsplash for each     │ │
-│     │ Lucide/Heroicons        │  │ image in the plan, collect URLs │ │
+│     │ @fluentui/svg-icons     │  │ image in the plan, collect URLs │ │
 │     │ Return: { name: svg }   │  │ Return: { section: url }       │ │
 │     └─────────────────────────┘  └─────────────────────────────────┘ │
 │                                                                        │
@@ -484,7 +572,7 @@ For multi-page designs, spawn **one agent per page** that handles both icons AND
 │  2. Build Design Language page in Figma                │
 │  3. Spawn parallel Agents — one per page:              │
 │     Each agent does ALL asset work for its page:       │
-│     a. Fetches all icons from Lucide/Heroicons         │
+│     a. Fetches all icons from @fluentui/svg-icons      │
 │     b. Searches Unsplash for all images                │
 │     c. Generates AI images if stock not found          │
 │     d. Returns scripts array with assets baked in      │
